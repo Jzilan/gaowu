@@ -3,7 +3,7 @@
 //   import 'https://testingcf.jsdelivr.net/gh/NLKASHEI/114514@v1.1.4/高武配置小助手.min.js'
 // ═══════════════════════════════════════════════════════════
 
-const GAOWU_VERSION = '1.0.0';
+const GAOWU_VERSION = '1.0.1';
 const p = window.parent || window;
 
 // 清理旧实例
@@ -235,10 +235,29 @@ CSS.textContent = `
     background: rgba(212,161,58,0.12) !important; border-color: #d4a13a !important;
     color: #fff !important;
   }
-  .gw-switch-domain-btn.active {
-    background: #d4a13a !important; border-color: #f6df9a !important;
+  .gw-switch-domain-btn.on {
+    background: linear-gradient(160deg, #d4a13a, #8a6a2a) !important;
+    border-color: #d4a13a !important;
     color: #0a0804 !important; font-weight: 700 !important;
-    box-shadow: 0 0 12px rgba(212,161,58,0.4) !important;
+    box-shadow: 0 2px 10px rgba(212,161,58,0.2) !important;
+    text-shadow: none !important;
+  }
+  .gw-switch-domain-btn.on:hover {
+    background: linear-gradient(160deg, #e9c25e, #a0782a) !important;
+    border-color: #f6df9a !important; box-shadow: 0 4px 16px rgba(212,161,58,0.32) !important;
+    color: #0a0804 !important;
+  }
+  .gw-switch-domain-btn.off {
+    background: #14100c !important; border-color: #2a1f10 !important;
+    color: #6a5a3a !important; font-weight: 500 !important;
+    box-shadow: none !important; opacity: 0.5;
+  }
+  .gw-switch-domain-btn.off:hover {
+    background: #1c1610 !important; border-color: #4a3a1a !important;
+    color: #9a8a5a !important; opacity: 0.8;
+  }
+  .gw-switch-domain-btn:active {
+    transform: scale(0.96) !important; filter: brightness(1.15) !important;
   }
   .gw-switch-panel .gw-status-inline {
     display: flex; align-items: center; gap: 8px; font-size: 12px;
@@ -592,11 +611,8 @@ const BLUE_STAR_COMMENTS = [
 
 const COSMOS_COMMENTS = [
   '境界划分（宇宙）',
-  '武器（宇宙）',
-  '外部文明概况',
-  '文明生成规则',
-  '宇宙种族设定',
-  '人物生成规则（宇宙）',
+  '宇宙文明与外部文明设定',
+  '宇宙人物生成与万族种族',
   '势力详情：赤渊联邦（骨人文明）',
   '势力详情：沧溟联邦（鱼人文明）',
   '势力详情：枢机议会（机械文明）',
@@ -611,7 +627,8 @@ const COSMOS_COMMENTS = [
 ];
 
 const BLUE_STAR_IDS = [2, 7, 11];
-const COSMOS_IDS = [12, 27, 28, 30, 32, 33, 34, 35, 38, 41, 43, 44, 45, 46, 47, 48, 49];
+const COSMOS_IDS = [12, 34, 35, 38, 41, 43, 44, 45, 46, 47, 48, 49];
+const COSMOS_EXCLUDE = ['武器与机铠体系'];
 
 function getSelectedDomain() {
   for (const btn of domainBtns) {
@@ -1668,34 +1685,60 @@ async function refreshStatus() {
     const entries = await api_getWorldbook(wbName);
 
     // 独立判断各domain开关状态：只要列表中任一条目enabled即为ON
-    let blueStarOn = entries.some(e => {
-      if (e.enabled && (BLUE_STAR_COMMENTS.includes(e.comment) || BLUE_STAR_COMMENTS.includes(e.name) || BLUE_STAR_IDS.includes(e.uid) || BLUE_STAR_IDS.includes(e.id))) return true;
-      return false;
-    });
-    let cosmosOn = entries.some(e => {
-      if (e.enabled && (COSMOS_COMMENTS.includes(e.comment) || COSMOS_COMMENTS.includes(e.name) || COSMOS_IDS.includes(e.uid) || COSMOS_IDS.includes(e.id))) return true;
-      return false;
-    });
+    const blueMatched = entries.filter(e => BLUE_STAR_COMMENTS.includes(e.comment) || BLUE_STAR_COMMENTS.includes(e.name) || BLUE_STAR_IDS.includes(e.uid) || BLUE_STAR_IDS.includes(e.id));
+    const cosmosMatched = entries.filter(e => (COSMOS_COMMENTS.includes(e.comment) || COSMOS_COMMENTS.includes(e.name) || COSMOS_IDS.includes(e.uid) || COSMOS_IDS.includes(e.id)) && !(COSMOS_EXCLUDE.includes(e.comment) || COSMOS_EXCLUDE.includes(e.name)));
+    const blueStarOn = blueMatched.some(e => entryEnabled(e));
+    const cosmosOn = cosmosMatched.some(e => entryEnabled(e));
+
+    console.log('[高武配置] 条目总数', entries.length);
+    console.log('[高武配置] 蓝星匹配', blueMatched.length, blueMatched.map(e => e.comment || e.name || ('#' + e.uid)));
+    console.log('[高武配置] 宇宙匹配', cosmosMatched.length, cosmosMatched.map(e => e.comment || e.name || ('#' + e.uid)));
+    console.log('[高武配置] 蓝星ON', blueStarOn, '宇宙ON', cosmosOn, '| 宇宙样例', cosmosMatched[0] && { comment: cosmosMatched[0].comment, enabled: cosmosMatched[0].enabled, disable: cosmosMatched[0].disable });
+
+    ensureAlwaysOn(entries, wbName);
 
     for (const btn of domainBtns) {
       const isCosmos = btn.dataset.domain === 'cosmos';
-      btn.classList.toggle('active', isCosmos ? cosmosOn : blueStarOn);
+      const on = isCosmos ? cosmosOn : blueStarOn;
+      btn.classList.toggle('on', on);
+      btn.classList.toggle('off', !on);
     }
 
     wbCount.innerHTML = '当前共 <b style="color:#d4a13a">' + entries.length + '条</b> 条目';
 
     statusList.innerHTML =
-      renderStatusInline('蓝星', blueStarOn) +
-      renderStatusInline('宇宙', cosmosOn);
+      renderStatusInline('蓝星', blueStarOn, blueMatched.length) +
+      renderStatusInline('宇宙', cosmosOn, cosmosMatched.length);
   } catch (e) {
     wbCount.innerHTML = '<span style="color:#c94f3d">获取条目失败: ' + e.message + '</span>';
     statusList.innerHTML = '<span class="gw-status-inline"><span class="status-dot off"></span><span class="status-label">获取失败</span></span>';
   }
 }
 
-function renderStatusInline(label, isOn) {
+function entryEnabled(e) {
+  if (typeof e.enabled === 'boolean') return e.enabled;
+  if (typeof e.disable === 'boolean') return !e.disable;
+  return false;
+}
+
+let _lastEnsure = 0;
+function ensureAlwaysOn(entries, wbName) {
+  if (!wbName || !entries || !entries.length) return;
+  const need = entries.filter(e => COSMOS_EXCLUDE.includes(e.comment) || COSMOS_EXCLUDE.includes(e.name));
+  if (need.length === 0) return;
+  if (need.every(e => entryEnabled(e))) return;
+  const now = Date.now();
+  if (now - _lastEnsure < 3000) return;
+  _lastEnsure = now;
+  const mod = `(entries) => { var xList = ${JSON.stringify(COSMOS_EXCLUDE)}; for (var i = 0; i < entries.length; i++) { var e = entries[i]; if (xList.includes(e.comment) || xList.includes(e.name)) { e.enabled = true; e.disable = false; } } }`;
+  api_replaceWorldbook(wbName, mod).then(() => { refreshStatus(); }).catch(() => {});
+}
+
+function renderStatusInline(label, isOn, matched) {
   const cls = isOn ? 'on' : 'off';
-  return '<span class="gw-status-inline"><span class="status-dot ' + cls + '"></span><span class="status-label">' + label + '</span></span>';
+  const cnt = (matched != null) ? ' <span style="font-size:10px;opacity:0.65">(' + matched + '条)</span>' : '';
+  const zero = (matched === 0) ? ' <span style="font-size:10px;color:#c94f3d">未找到</span>' : '';
+  return '<span class="gw-status-inline"><span class="status-dot ' + cls + '"></span><span class="status-label">' + label + cnt + zero + '</span></span>';
 }
 
 // --- 执行独立开关（每个domain独立toggle） ---
@@ -1716,20 +1759,30 @@ async function doToggle(domain) {
   const commentsJson = JSON.stringify(comments);
   const idsJson = JSON.stringify(ids);
   const label = domain === 'cosmos' ? '宇宙' : '蓝星';
+  const exclude = domain === 'cosmos' ? COSMOS_EXCLUDE : [];
+  const excludeJson = JSON.stringify(exclude);
 
   const modifierFn = `(entries) => {` +
     `  var cList = ` + commentsJson + `;` +
     `  var idList = ` + idsJson + `;` +
     `  for (var i = 0; i < entries.length; i++) {` +
     `    var e = entries[i];` +
-    `    var match = cList.includes(e.comment) || cList.includes(e.name) || idList.includes(e.uid) || idList.includes(e.id);` +
-    `    if (match) { e.enabled = !e.enabled; }` +
+    `    var xList = ` + excludeJson + `;` +
+    `    var match = (cList.includes(e.comment) || cList.includes(e.name) || idList.includes(e.uid) || idList.includes(e.id)) && !(xList.includes(e.comment) || xList.includes(e.name));` +
+    `    if (match) { var cur = (typeof e.enabled === 'boolean') ? e.enabled : ((typeof e.disable === 'boolean') ? !e.disable : false); e.enabled = !cur; e.disable = cur; }` +
     `  }` +
     `}`;
 
   try {
+    const before = await api_getWorldbook(wbName);
+    const matched = before.filter(e => (comments.includes(e.comment) || comments.includes(e.name) || ids.includes(e.uid) || ids.includes(e.id)) && !exclude.includes(e.comment) && !exclude.includes(e.name));
+    console.log('[高武配置] 切换「' + label + '」命中', matched.length, '条:', matched.map(e => ({ comment: e.comment, name: e.name, uid: e.uid, id: e.id, enabled: e.enabled, disable: e.disable })));
+    if (matched.length === 0) {
+      showToast('「' + label + '」未匹配到任何条目（0条）—请检查世界书条目备注/名字是否与脚本一致');
+      return;
+    }
     await api_replaceWorldbook(wbName, modifierFn);
-    showToast('已切换「' + label + '」条目');
+    showToast('已切换「' + label + '」条目（' + matched.length + '条）');
     await refreshStatus();
   } catch (e) {
     console.error('[高武配置] doToggle error:', e);
